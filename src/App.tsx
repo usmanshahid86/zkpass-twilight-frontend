@@ -3,7 +3,7 @@
  * Maintains the design flow you liked from the previous version
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { SelfVerification } from './components/SelfVerification';
 import './App.css';
 

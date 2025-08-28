@@ -20,7 +20,8 @@ interface SelfVerificationProps {
 
 export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onVerificationComplete }) => {
   // Environment configuration
-  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+  const BACKEND_URL =
+    import.meta.env.VITE_BACKEND_URL || "https://5a80ea2fef72.ngrok-free.app";
   const APP_NAME = import.meta.env.VITE_SELF_APP_NAME || 'Twilight Self Passport';
   const SCOPE = import.meta.env.VITE_SELF_SCOPE || 'twilight-relayer-passport';
   
@@ -28,7 +29,6 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
   const [selfApp, setSelfApp] = useState<SelfApp | null>(null);
   const [universalLink, setUniversalLink] = useState<string>('');
   const [userId, setUserId] = useState(ethers.ZeroAddress);
-  const [backendConnected, setBackendConnected] = useState<boolean>(false);
   const [verificationStatus, setVerificationStatus] = useState<{
     status: 'idle' | 'loading' | 'opened' | 'success' | 'error';
     message: string;
@@ -50,25 +50,23 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
     testBackendConnection();
   }, []);
 
-  // configuration for the self app
-
   
   // Initialize Self Protocol
   // This function initializes the Self Protocol and sets up the Self App
 
   const initializeSelfProtocol = async () => {
     try {
-      console.log('🚀 Initializing Self Protocol with real SDK...');
+      console.log('🚀 Initializing Self Protocol with connection to Self App...');
       
       const selfAppBuilder = new SelfAppBuilder({
         version: 2,
         appName: APP_NAME,
         scope: SCOPE,
         endpoint: `${BACKEND_URL}/api/verify`,
-        logoBase64: "https://i.postimg.cc/mrmVf9hm/self.png",
+        logoBase64: "https://i.postimg.cc/mrmVf9hm/self.png", // add Twilight logo here later. This will be displayed in the Self App.in the self app
         userId: userId,
         endpointType: "staging_https",
-        userIdType: "hex",
+        userIdType: "uuid",
         userDefinedData: "Bonjour Cannes!",
         disclosures: {
           // 1. what you want to verify from users' identity
@@ -127,7 +125,6 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
       if (response.ok) {
         const data = await response.json();
         console.log('✅ Backend server connected:', data);
-        setBackendConnected(true);
         
         // Update verification step
         setVerificationSteps(prev => ({ ...prev, backendConnected: true }));
@@ -136,7 +133,6 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
       }
     } catch (error) {
       console.warn('⚠️ Backend server not reachable:', error);
-      setBackendConnected(false);
     }
   };
 
@@ -239,44 +235,47 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
         <span>{verificationStatus.message}</span>
       </div>
 
-      {/* Configuration Info - Your preferred way to show what's happening */}
-      <div className="config-info">
-        <h4>Self Protocol Configuration:</h4>
-        <ul>
-          <li>✅ App Name: "Twilight Self Passport"</li>
-          <li>✅ Scope: "twilight-relayer-passport"</li>
-          <li>✅ User Data: "Bonjour Cannes!"</li>
-          <li>✅ Min Age: 18</li>
-          <li>✅ Disclosures: nationality, gender</li>
-          <li>🔗 Backend: {BACKEND_URL}/api/verify</li>
-          <li>📋 Supported IDs: Passport, EU ID Card</li>
-          <li>👤 User ID: {userId.substring(0, 10)}...</li>
-        </ul>
-      </div>
+      {/* Wrap both sections in a container */}
+      <div className="info-sections-container">
+        {/* Configuration Info */}
+        <div className="config-info">
+          <h4>Self Protocol Configuration:</h4>
+          <ul>
+            <li>✅ App Name: "Twilight Self Passport"</li>
+            <li>✅ Scope: "twilight-relayer-passport"</li>
+            <li>✅ User Data: "Bonjour Cannes!"</li>
+            <li>✅ Min Age: 18</li>
+            <li>✅ Disclosures: nationality, gender</li>
+            <li>🔗 Backend: {BACKEND_URL}/api/verify</li>
+            <li>📋 Supported IDs: Passport, EU ID Card</li>
+            <li>👤 User ID: {userId.substring(0, 10)}...</li>
+          </ul>
+        </div>
 
-      {/* Real-time Process Information with Dynamic Updates */}
-      <div className="process-info">
-        <h4>🔄 Verification Process:</h4>
-        <ol>
-          <li className={getStepClass(verificationSteps.sdkInitialized)}>
-            {getStepIcon(verificationSteps.sdkInitialized)} Self Protocol SDK initialized
-          </li>
-          <li className={getStepClass(verificationSteps.backendConnected)}>
-            {getStepIcon(verificationSteps.backendConnected)} Backend server connected
-          </li>
-          <li className={getStepClass(verificationSteps.appScanned)}>
-            {getStepIcon(verificationSteps.appScanned)} Self app scan completed
-          </li>
-          <li className={getStepClass(verificationSteps.proofProvided)}>
-            {getStepIcon(verificationSteps.proofProvided)} User provided identity proof
-          </li>
-          <li className={getStepClass(verificationSteps.backendVerified)}>
-            {getStepIcon(verificationSteps.backendVerified)} Backend verified zero-knowledge proof
-          </li>
-          <li className={getStepClass(verificationSteps.resultReturned)}>
-            {getStepIcon(verificationSteps.resultReturned)} Verification result returned
-          </li>
-        </ol>
+        {/* Process Info */}
+        <div className="process-info">
+          <h4>🔄 Verification Process:</h4>
+          <ol>
+            <li className={getStepClass(verificationSteps.sdkInitialized)}>
+              {getStepIcon(verificationSteps.sdkInitialized)} Self Protocol SDK initialized
+            </li>
+            <li className={getStepClass(verificationSteps.backendConnected)}>
+              {getStepIcon(verificationSteps.backendConnected)} Backend server connected
+            </li>
+            <li className={getStepClass(verificationSteps.appScanned)}>
+              {getStepIcon(verificationSteps.appScanned)} Self app scan completed
+            </li>
+            <li className={getStepClass(verificationSteps.proofProvided)}>
+              {getStepIcon(verificationSteps.proofProvided)} User provided identity proof
+            </li>
+            <li className={getStepClass(verificationSteps.backendVerified)}>
+              {getStepIcon(verificationSteps.backendVerified)} Backend verified zero-knowledge proof
+            </li>
+            <li className={getStepClass(verificationSteps.resultReturned)}>
+              {getStepIcon(verificationSteps.resultReturned)} Verification result returned
+            </li>
+          </ol>
+        </div>
       </div>
     </div>
   );

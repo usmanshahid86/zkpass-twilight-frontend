@@ -168,20 +168,23 @@
   padding: 2rem 0;
 }
 
+/* Enhanced contrast version */
 .verification-container {
   max-width: 700px;
   margin: 2rem auto;
   padding: 2rem;
-  background: #f8f9fa;
-  color: #2c3e50;
+  background: #ffffff; /* Pure white for maximum contrast */
+  color: #1a1a1a; /* Very dark text */
   border-radius: 20px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
   text-align: center;
+  border: 1px solid #e9ecef;
 }
 
 .verification-container h1 {
-  color: #2c3e50;
+  color: #212529; /* Darker heading */
   margin-bottom: 0.5rem;
+  font-weight: 700;
 }
 
 .backend-status {
@@ -190,10 +193,12 @@
   justify-content: center;
   gap: 0.5rem;
   margin: 1rem 0;
-  padding: 0.5rem;
-  background: #e9ecef;
+  padding: 0.75rem;
+  background: #e3f2fd;
+  border: 1px solid #2196f3;
   border-radius: 8px;
   font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .qr-code-container {
@@ -244,6 +249,7 @@
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
+  align-items: center;
   padding: 1rem 2rem;
   border-radius: 10px;
   font-size: 1rem;
@@ -269,7 +275,8 @@
   justify-content: center;
   gap: 0.8rem;
   padding: 1rem;
-  background: #f1f3f4;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
   border-radius: 10px;
   margin: 2rem 0;
   font-weight: 500;
@@ -329,9 +336,10 @@
 }
 
 .config-info h4 {
-  color: #495057;
+  color: #212529;
   margin-bottom: 1rem;
   text-align: center;
+  font-weight: 600;
 }
 
 .config-info ul {
@@ -359,9 +367,10 @@
 }
 
 .process-info h4 {
-  color: #495057;
+  color: #212529;
   margin-bottom: 1rem;
   text-align: center;
+  font-weight: 600;
 }
 
 .process-info ol {
