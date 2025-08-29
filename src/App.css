@@ -407,3 +407,20 @@
     padding: 1rem;
   }
 }
+
+.verification-success {
+  text-align: center;
+  padding: 20px;
+  border-radius: 8px;
+  background-color: #f0f8f0;
+  border: 1px solid #4caf50;
+}
+
+.verification-success h4 {
+  color: #2e7d32;
+  margin-bottom: 10px;
+}
+
+.verification-success p {
+  color: #1b5e20;
+}

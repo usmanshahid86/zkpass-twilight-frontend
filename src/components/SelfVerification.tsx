@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { getUniversalLink } from "@selfxyz/core";
 import { SelfQRcodeWrapper, SelfAppBuilder, type SelfApp } from "@selfxyz/qrcode";
-import { ethers } from "ethers";
+import { v4 as uuidv4 } from 'uuid';
 
 interface VerificationResult {
   verified: boolean;
@@ -21,14 +21,15 @@ interface SelfVerificationProps {
 export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onVerificationComplete }) => {
   // Environment configuration
   const BACKEND_URL =
-    import.meta.env.VITE_BACKEND_URL || "https://5a80ea2fef72.ngrok-free.app";
+    import.meta.env.VITE_BACKEND_URL ||
+    "https://twilight-self-backend-production.up.railway.app";
   const APP_NAME = import.meta.env.VITE_SELF_APP_NAME || 'Twilight Self Passport';
   const SCOPE = import.meta.env.VITE_SELF_SCOPE || 'twilight-relayer-passport';
   
   // State management
   const [selfApp, setSelfApp] = useState<SelfApp | null>(null);
   const [universalLink, setUniversalLink] = useState<string>('');
-  const [userId, setUserId] = useState(ethers.ZeroAddress);
+  const [userId, setUserId] = useState(uuidv4());
   const [verificationStatus, setVerificationStatus] = useState<{
     status: 'idle' | 'loading' | 'opened' | 'success' | 'error';
     message: string;
@@ -41,8 +42,10 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
     appScanned: false,
     proofProvided: false,
     backendVerified: false,
-    resultReturned: false
   });
+
+  // Add a new state to track verification completion
+  const [isVerified, setIsVerified] = useState(false);
 
   // Initialize Self Protocol on component mount
   useEffect(() => {
@@ -67,21 +70,21 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
         userId: userId,
         endpointType: "staging_https",
         userIdType: "uuid",
-        userDefinedData: "Bonjour Cannes!",
+        userDefinedData: "Twilight Framework Self Passport Integration Test!",
         disclosures: {
           // 1. what you want to verify from users' identity
-          minimumAge: 18,
-          // ofac: false,
-          // excludedCountries: [countries.BELGIUM],
+          // minimumAge: 18,
+          ofac: true,
+          excludedCountries: ['IRN', 'PRK', 'CUB','SYR'],
 
           // 2. what you want users to reveal (Optional)
-          nationality: true,
-          gender: true,
-          // date_of_birth: true,
-          // passport_number: false,
-          // expiry_date: false,
-          // issuing_state: true,
-          // name: false,
+          nationality: false,
+          gender: false,
+          date_of_birth: false,
+          passport_number: false,
+          expiry_date: true,
+          issuing_state: true,
+           name: false,
         },
       });
 
@@ -93,17 +96,13 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
       // Update verification step
       setVerificationSteps(prev => ({ ...prev, sdkInitialized: true }));
 
-      // Generate universal link and user ID
-      const wallet = ethers.Wallet.createRandom();
-      const userIdHex = wallet.address;
-      setUserId(userIdHex);
       
       const link = getUniversalLink(app);
       setUniversalLink(link);
       
       console.log('✅ Self Protocol initialized successfully');
       console.log('🔗 Universal Link:', link);
-      console.log('👤 User ID:', userIdHex);
+      console.log('👤 User ID:', userId);
       
     } catch (error) {
       console.error('❌ Failed to initialize Self app:', error);
@@ -139,12 +138,15 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
   const handleSuccessfulVerification = () => {
     console.log("🎉 Verification successful!");
     
+    // Set verification flag
+    setIsVerified(true);
+    
     // Update all remaining verification steps
     setVerificationSteps(prev => ({
       ...prev,
+      appScanned: true, // Add this line to fix the scan status
       proofProvided: true,
-      backendVerified: true,
-      resultReturned: true
+      backendVerified: true
     }));
     
     setVerificationStatus({
@@ -152,7 +154,7 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
       message: '🎉 Identity verification completed successfully!'
     });
     
-    // Hide the QR code component to prevent React errors
+    // Hide the QR code component
     setSelfApp(null);
     
     // Notify parent component
@@ -174,13 +176,13 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
   const openSelfApp = () => {
     if (universalLink) {
       console.log('📱 Opening Self app with universal link:', universalLink);
-      window.open(universalLink, "_blank");
+      window.open(universalLink, '_blank');
       setVerificationStatus({
         status: 'opened',
         message: '📱 Self app opened - complete verification there'
       });
       
-      // Update verification step
+      // Update verification step for app scan
       setVerificationSteps(prev => ({ ...prev, appScanned: true }));
     }
   };
@@ -195,13 +197,17 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
       
       {/* QR Code Section */}
       <div className="qr-section">
-        {selfApp ? (
+        {isVerified ? (
+          <div className="verification-success">
+            <h4>✅ Verification Complete</h4>
+            <p>Your identity has been successfully verified!</p>
+          </div>
+        ) : selfApp ? (
           <div className="qr-display">
             <h4>📱 Scan QR Code with Self App</h4>
             <div className="qr-container">
               <SelfQRcodeWrapper
                 selfApp={selfApp}
-               // userId={userId}
                 onSuccess={handleSuccessfulVerification}
                 onError={handleVerificationError}
               />
@@ -243,11 +249,10 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
           <ul>
             <li>✅ App Name: "Twilight Self Passport"</li>
             <li>✅ Scope: "twilight-relayer-passport"</li>
-            <li>✅ User Data: "Bonjour Cannes!"</li>
-            <li>✅ Min Age: 18</li>
-            <li>✅ Disclosures: nationality, gender</li>
-            <li>🔗 Backend: {BACKEND_URL}/api/verify</li>
-            <li>📋 Supported IDs: Passport, EU ID Card</li>
+            <li>✅ User Data: "Twilight Framework Self Passport Integration Test!"</li>
+            <li>✅ Disclosures: issuing_state, expiry_date</li>
+            <li>✅ OFAC: true</li>
+            <li>✅ Excluded Countries: IRN, PRK, CUB, SYR</li>
             <li>👤 User ID: {userId.substring(0, 10)}...</li>
           </ul>
         </div>
@@ -257,10 +262,10 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
           <h4>🔄 Verification Process:</h4>
           <ol>
             <li className={getStepClass(verificationSteps.sdkInitialized)}>
-              {getStepIcon(verificationSteps.sdkInitialized)} Self Protocol SDK initialized
+              {getStepIcon(verificationSteps.sdkInitialized)} Self Protocol App initialized
             </li>
             <li className={getStepClass(verificationSteps.backendConnected)}>
-              {getStepIcon(verificationSteps.backendConnected)} Backend server connected
+              {getStepIcon(verificationSteps.backendConnected)} Verification server connected
             </li>
             <li className={getStepClass(verificationSteps.appScanned)}>
               {getStepIcon(verificationSteps.appScanned)} Self app scan completed
@@ -269,10 +274,7 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
               {getStepIcon(verificationSteps.proofProvided)} User provided identity proof
             </li>
             <li className={getStepClass(verificationSteps.backendVerified)}>
-              {getStepIcon(verificationSteps.backendVerified)} Backend verified zero-knowledge proof
-            </li>
-            <li className={getStepClass(verificationSteps.resultReturned)}>
-              {getStepIcon(verificationSteps.resultReturned)} Verification result returned
+              {getStepIcon(verificationSteps.backendVerified)} Identity proof verified
             </li>
           </ol>
         </div>
