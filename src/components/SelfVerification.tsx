@@ -8,6 +8,7 @@ import { getUniversalLink } from "@selfxyz/core";
 import { SelfQRcodeWrapper, SelfAppBuilder, type SelfApp } from "@selfxyz/qrcode";
 import { v4 as uuidv4 } from 'uuid';
 
+
 interface VerificationResult {
   verified: boolean;
   timestamp: number;
@@ -16,6 +17,12 @@ interface VerificationResult {
 
 interface SelfVerificationProps {
   onVerificationComplete: (result: VerificationResult) => void;
+}
+
+interface VerificationStatus {
+  status: 'idle' | 'loading' | 'opened' | 'success' | 'error';
+  message: string;
+  details?: string;
 }
 
 export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onVerificationComplete }) => {
@@ -29,11 +36,11 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
   // State management
   const [selfApp, setSelfApp] = useState<SelfApp | null>(null);
   const [universalLink, setUniversalLink] = useState<string>('');
-  const [userId, setUserId] = useState(uuidv4());
-  const [verificationStatus, setVerificationStatus] = useState<{
-    status: 'idle' | 'loading' | 'opened' | 'success' | 'error';
-    message: string;
-  }>({ status: 'idle', message: 'Ready to start verification' });
+  const [userId] = useState(uuidv4());
+  const [verificationStatus, setVerificationStatus] = useState<VerificationStatus>({ 
+    status: 'idle', 
+    message: 'Ready to start verification' 
+  });
 
   // New state for tracking verification steps
   const [verificationSteps, setVerificationSteps] = useState({
@@ -74,7 +81,7 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
         disclosures: {
           // 1. what you want to verify from users' identity
           // minimumAge: 18,
-          ofac: true,
+          ofac: false,
           excludedCountries: ['IRN', 'PRK', 'CUB','SYR'],
 
           // 2. what you want users to reveal (Optional)
@@ -115,23 +122,23 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
 
   const testBackendConnection = async () => {
     try {
-      console.log('🔍 Testing backend connectivity...');
+      console.log('🔍 Testing backend connectivity...', BACKEND_URL);
       const response = await fetch(`${BACKEND_URL}/health`, {
         headers: {
-          'ngrok-skip-browser-warning': 'true'  // This bypasses the ngrok warning
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
         }
       });
       if (response.ok) {
         const data = await response.json();
         console.log('✅ Backend server connected:', data);
-        
-        // Update verification step
         setVerificationSteps(prev => ({ ...prev, backendConnected: true }));
       } else {
         throw new Error(`Backend server responded with status: ${response.status}`);
       }
     } catch (error) {
       console.warn('⚠️ Backend server not reachable:', error);
+      console.warn('⚠️ Attempted URL:', `${BACKEND_URL}/health`);
     }
   };
 
@@ -165,12 +172,39 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
     });
   };
 
-  const handleVerificationError = () => {
-    console.error("❌ Verification failed");
+  const handleVerificationError = (error?: any) => {
+    console.error("❌ Verification failed", error);
+    
+    let errorMessage = '❌ Identity verification failed';
+    let errorDetails = '';
+    
+    if (error?.message?.includes('country')) {
+      errorMessage = '❌ Country not eligible for verification';
+      errorDetails = 'This passport is from a country that is not eligible for verification.';
+    } else if (error?.message) {
+      errorMessage = '❌ Verification failed';
+      errorDetails = error.message;
+    }
+
     setVerificationStatus({
       status: 'error',
-      message: '❌ Identity verification failed'
+      message: errorMessage,
+      details: errorDetails
     });
+
+    setVerificationSteps(prev => ({
+      ...prev,
+      appScanned: true,
+      proofProvided: true,
+      backendVerified: false
+    }));
+
+    setSelfApp(null);
+  };
+
+  const handleRetry = () => {
+    setVerificationStatus({ status: 'idle', message: 'Ready to start verification' });
+    initializeSelfProtocol();
   };
 
   const openSelfApp = () => {
@@ -197,7 +231,20 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
       
       {/* QR Code Section */}
       <div className="qr-section">
-        {isVerified ? (
+        {verificationStatus.status === 'error' ? (
+          <div className="verification-error">
+            <h4>{verificationStatus.message}</h4>
+            {verificationStatus.details && (
+              <p className="error-details">{verificationStatus.details}</p>
+            )}
+            <button 
+              className="retry-button"
+              onClick={handleRetry}
+            >
+              🔄 Try Again
+            </button>
+          </div>
+        ) : isVerified ? (
           <div className="verification-success">
             <h4>✅ Verification Complete</h4>
             <p>Your identity has been successfully verified!</p>
