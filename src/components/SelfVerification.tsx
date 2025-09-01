@@ -54,6 +54,9 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
   // Add a new state to track verification completion
   const [isVerified, setIsVerified] = useState(false);
 
+  // Hardcoded cosmos address for testing
+  const TEST_COSMOS_ADDRESS = "cosmos1zyxwvut7cglh3gm0dtq2gxv76xcf54knh2kdwh";
+
   // Initialize Self Protocol on component mount
   useEffect(() => {
     initializeSelfProtocol();
@@ -142,64 +145,92 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
     }
   };
 
-  const handleSuccessfulVerification = () => {
+  const handleSuccessfulVerification = async () => {
     console.log("🎉 Verification successful!");
     
-    // Set verification flag
-    setIsVerified(true);
-    
-    // Update all remaining verification steps
-    setVerificationSteps(prev => ({
-      ...prev,
-      appScanned: true, // Add this line to fix the scan status
-      proofProvided: true,
-      backendVerified: true
-    }));
-    
-    setVerificationStatus({
-      status: 'success',
-      message: '🎉 Identity verification completed successfully!'
-    });
-    
-    // Hide the QR code component
-    setSelfApp(null);
-    
-    // Notify parent component
-    onVerificationComplete({
-      verified: true,
-      timestamp: Date.now(),
-      source: 'self-protocol'
-    });
+    try {
+      console.log('📤 Sending verification data to backend...', {
+        cosmosAddress: TEST_COSMOS_ADDRESS,
+        attestationId: userId
+      });
+
+      const response = await fetch(`${BACKEND_URL}/api/verify/self`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          cosmosAddress: TEST_COSMOS_ADDRESS,
+          uuid: userId
+        })
+      });
+
+      // display the response to the console
+      console.log('📤 Response from backend for CosmosAddress communication:', response);
+
+      // Set verification flag
+      setIsVerified(true);
+      
+      // Update all remaining verification steps
+      setVerificationSteps(prev => ({
+        ...prev,
+        appScanned: true, // Add this line to fix the scan status
+        proofProvided: true,
+        backendVerified: true
+      }));
+      
+      setVerificationStatus({
+        status: 'success',
+        message: '🎉 Identity verification completed successfully!'
+      });
+      
+      // Hide the QR code component
+      setSelfApp(null);
+      
+      // Notify parent component
+      onVerificationComplete({
+        verified: true,
+        timestamp: Date.now(),
+        source: 'self-protocol'
+      });
+    } catch (error) {
+      console.error("❌ Verification failed", error);
+
+      setVerificationStatus({
+        status: "error",
+        message: "❌ Verification succeeded but failed to save data",
+        details: error instanceof Error ? error.message : 'Unknown error occurred',
+      });
+
+      setVerificationSteps(prev => ({
+        ...prev,
+        appScanned: true,
+        proofProvided: true,
+        backendVerified: false
+      }));
+
+      setSelfApp(null);
+    }
   };
 
-  const handleVerificationError = (error?: any) => {
+  const handleVerificationError = (error: unknown) => {
     console.error("❌ Verification failed", error);
+
+    let errorDetails = 'Unknown error occurred';
     
-    let errorMessage = '❌ Identity verification failed';
-    let errorDetails = '';
-    
-    if (error?.message?.includes('country')) {
-      errorMessage = '❌ Country not eligible for verification';
-      errorDetails = 'This passport is from a country that is not eligible for verification.';
-    } else if (error?.message) {
-      errorMessage = '❌ Verification failed';
+    if (error instanceof Error) {
       errorDetails = error.message;
+    } else if (typeof error === 'string') {
+      errorDetails = error;
+    } else if (error && typeof error === 'object' && 'message' in error) {
+      errorDetails = String(error.message);
     }
 
     setVerificationStatus({
-      status: 'error',
-      message: errorMessage,
-      details: errorDetails
+      status: "error",
+      message: "❌ Verification succeeded but failed to save data",
+      details: errorDetails,
     });
-
-    setVerificationSteps(prev => ({
-      ...prev,
-      appScanned: true,
-      proofProvided: true,
-      backendVerified: false
-    }));
-
-    setSelfApp(null);
   };
 
   const handleRetry = () => {

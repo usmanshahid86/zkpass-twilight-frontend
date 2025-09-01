@@ -11,20 +11,24 @@ interface VerificationResult {
   verified: boolean;
   timestamp: number;
   source: string;
-  result?: any;
+  attestationId?: string;  // Add this for Self Protocol verification
+  cosmosAddress?: string;  // Add this to show connected address
 }
 
 function App() {
   const [showVerification, setShowVerification] = useState(false);
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
-  const [welcomeMessage, setWelcomeMessage] = useState('Welcome');
+  const [welcomeMessage, setWelcomeMessage] = useState('Welcome to Twilight Identity Verification');
 
   const handleVerificationComplete = (result: VerificationResult) => {
     setVerificationResult(result);
-    setWelcomeMessage('🛡️ Welcome, Verified User!');
+    setWelcomeMessage('🛡️ Identity Verified with Self Protocol!');
     
-    // Show success notification
-    console.log('🎉 Verification completed:', result);
+    // Show detailed success information
+    console.log('🎉 Verification completed:', {
+      ...result,
+      timestamp: new Date(result.timestamp).toLocaleString()
+    });
   };
 
   const handleVerifyClick = () => {
@@ -33,28 +37,26 @@ function App() {
 
   const handleWelcomeClick = () => {
     if (verificationResult) {
-      // Cycle through verified messages
+      // Updated messages to be more specific to Self Protocol
       const verifiedMessages = [
-        '🛡️ Welcome, Verified User!',
-        '✨ Self Protocol Verified!',
-        '🌟 Identity Confirmed!',
-        '🚀 Proof Generated!',
-        '💎 Verified Member!',
-        '🔐 Zero-Knowledge Verified!'
+        '🛡️ Identity Verified with Self Protocol!',
+        '✨ Self Protocol Verification Complete',
+        '🌟 Identity Proof Generated',
+        '🔐 Zero-Knowledge Proof Verified',
+        '💎 Self Protocol Member',
+        '🚀 Ready for Twilight'
       ];
       
       const currentIndex = verifiedMessages.indexOf(welcomeMessage);
       const nextIndex = (currentIndex + 1) % verifiedMessages.length;
       setWelcomeMessage(verifiedMessages[nextIndex]);
     } else {
-      // Show verification if not verified
       setShowVerification(true);
     }
   };
 
   return (
     <div className="app-container">
-      {/* Hero Section - Same design you liked */}
       <div className="hero-section">
         <div className="welcome-container">
           <h1 
@@ -68,37 +70,41 @@ function App() {
           </p>
           {!showVerification && (
             <button className="verify-button" onClick={handleVerifyClick}>
-              🛡️ Verify Identity
+              🛡️ Verify with Self Protocol
             </button>
           )}
           
           {verificationResult && (
             <div className="verification-badge">
-              <span>✅ Identity Verified</span>
-              <small>Click welcome message for more</small>
+              <span>✅ Identity Verified with Self Protocol</span>
+              <small>Verification ID: {verificationResult.attestationId?.substring(0, 8)}...</small>
+              {verificationResult.cosmosAddress && (
+                <small>Cosmos Address: {verificationResult.cosmosAddress.substring(0, 8)}...</small>
+              )}
+              <small>Verified at: {new Date(verificationResult.timestamp).toLocaleString()}</small>
             </div>
           )}
         </div>
       </div>
 
-      {/* Features Grid - Same as before */}
+      {/* Updated Features Grid */}
       <div className="features-grid">
         <div className="feature-card">
           <div className="feature-icon">🔐</div>
-          <div className="feature-title">Zero-Knowledge Proofs</div>
-          <p>Your personal data stays private. We only verify what's necessary without seeing your raw documents.</p>
+          <div className="feature-title">Self Protocol Integration</div>
+          <p>Secure identity verification using Self Protocol's zero-knowledge proofs.</p>
         </div>
         
         <div className="feature-card">
           <div className="feature-icon">⚡</div>
           <div className="feature-title">Instant Verification</div>
-          <p>Get verified in seconds using your government-issued documents through the Self app.</p>
+          <p>Quick verification process with the Self Protocol mobile app.</p>
         </div>
         
         <div className="feature-card">
           <div className="feature-icon">🌍</div>
-          <div className="feature-title">Global Support</div>
-          <p>Works with passports and identity documents from countries worldwide.</p>
+          <div className="feature-title">Compliant Verification</div>
+          <p>Supports verification from approved jurisdictions with built-in compliance checks.</p>
         </div>
       </div>
 
