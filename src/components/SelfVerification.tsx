@@ -28,8 +28,7 @@ interface VerificationStatus {
 export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onVerificationComplete }) => {
   // Environment configuration
   const BACKEND_URL =
-    import.meta.env.VITE_BACKEND_URL ||
-    "https://twilight-self-backend-production.up.railway.app";
+    import.meta.env.VITE_BACKEND_URL || "http://147.182.247.84:3001";
   const APP_NAME = import.meta.env.VITE_SELF_APP_NAME || 'Twilight Self Passport';
   const SCOPE = import.meta.env.VITE_SELF_SCOPE || 'twilight-relayer-passport';
   
@@ -96,6 +95,7 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
           issuing_state: true,
            name: false,
         },
+        devMode: true,
       });
 
   
