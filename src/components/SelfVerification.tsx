@@ -8,6 +8,8 @@ import { getUniversalLink } from "@selfxyz/core";
 import { SelfQRcodeWrapper, SelfAppBuilder, type SelfApp } from "@selfxyz/qrcode";
 import { v4 as uuidv4 } from 'uuid';
 
+  // Hardcoded cosmos address for testing
+  const TEST_COSMOS_ADDRESS = "twilight1zyxwvut7cglh3gm0dtq2gxv76xcf54knh2kjcc";
 
 interface VerificationResult {
   verified: boolean;
@@ -53,9 +55,6 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
   // Add a new state to track verification completion
   const [isVerified, setIsVerified] = useState(false);
 
-  // Hardcoded cosmos address for testing
-  const TEST_COSMOS_ADDRESS = "cosmos1zyxwvut7cglh3gm0dtq2gxv76xcf54knh2kjaa";
-
   // Initialize Self Protocol on component mount
   useEffect(() => {
     initializeSelfProtocol();
@@ -79,7 +78,7 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
         userId: userId,
         endpointType: "staging_https",
         userIdType: "uuid",
-        userDefinedData: "Twilight Framework Self Passport Integration Test!",
+        userDefinedData: TEST_COSMOS_ADDRESS,
         disclosures: {
           // 1. what you want to verify from users' identity
           // minimumAge: 18,
@@ -165,64 +164,64 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
       message: "🎉 Identity verification completed successfully!",
     });
 
-    try {
-      console.log("📤 Sending verification data to backend...", {
-        cosmosAddress: TEST_COSMOS_ADDRESS,
-        attestationId: userId,
-      });
+    // try {
+    //   console.log("📤 Sending verification data to backend...", {
+    //     cosmosAddress: TEST_COSMOS_ADDRESS,
+    //     attestationId: userId,
+    //   });
 
-      const response = await fetch(`${BACKEND_URL}/api/verify/self`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          cosmosAddress: TEST_COSMOS_ADDRESS,
-          uuid: userId,
-        }),
-      });
+    //   const response = await fetch(`${BACKEND_URL}/api/verify/self`, {
+    //     method: "POST",
+    //     headers: {
+    //       "Content-Type": "application/json",
+    //     },
+    //     body: JSON.stringify({
+    //       cosmosAddress: TEST_COSMOS_ADDRESS,
+    //       uuid: userId,
+    //     }),
+    //   });
 
-      // display the response to the console
-      console.log(
-        "📤 Raw Response from Server for CosmosAddress communication:",
-        response
-      );
+    //   // display the response to the console
+    //   console.log(
+    //     "📤 Raw Response from Server for CosmosAddress communication:",
+    //     response
+    //   );
 
-      // Parse and log the response data
-      const responseData = await response.json();
-      console.log("📤 Response Data:", {
-        status: responseData.status,
-        message: responseData.message,
-        savedData: responseData.data,
-        timestamp: new Date(responseData.timestamp).toLocaleString(),
-      });
-      // Identity proof verification is working fine. We need to save the data on the backend server.
-      if (!response.ok) {
-        throw new Error(
-          responseData.message ||
-            "Failed to save verification data on Backend server. Retry sending the cosmos address and uuid data"
-        );
-      }
+    //   // Parse and log the response data
+    //   const responseData = await response.json();
+    //   console.log("📤 Response Data:", {
+    //     status: responseData.status,
+    //     message: responseData.message,
+    //     savedData: responseData.data,
+    //     timestamp: new Date(responseData.timestamp).toLocaleString(),
+    //   });
+    //   // Identity proof verification is working fine. We need to save the data on the backend server.
+    //   if (!response.ok) {
+    //     throw new Error(
+    //       responseData.message ||
+    //         "Failed to save verification data on Backend server. Retry sending the cosmos address and uuid data"
+    //     );
+    //   }
 
-      // Notify parent component
-      onVerificationComplete({
-        verified: true,
-        timestamp: Date.now(),
-        source: "self-protocol",
-      });
-    } catch (error) {
-      // Sending Self Protocol Verification data to Backend server failed. The Identity verification is working fine.No need to do it again. 
-      // Send a notification to the user or retry sending the data to the backend server.
+    //   // Notify parent component
+    //   onVerificationComplete({
+    //     verified: true,
+    //     timestamp: Date.now(),
+    //     source: "self-protocol",
+    //   });
+    // } catch (error) {
+    //   // Sending Self Protocol Verification data to Backend server failed. The Identity verification is working fine.No need to do it again. 
+    //   // Send a notification to the user or retry sending the data to the backend server.
 
-      console.error("❌ Sending Self Protocol Verification data to Backend server failed", error);
+    //   console.error("❌ Sending Self Protocol Verification data to Backend server failed", error);
 
-      setVerificationStatus({
-        status: "error",
-        message: "❌ Sending Self Protocol Verification data to Backend server failed",
-        details:
-          error instanceof Error ? error.message : "Unknown error occurred",
-      });
-    }
+    //   setVerificationStatus({
+    //     status: "error",
+    //     message: "❌ Sending Self Protocol Verification data to Backend server failed",
+    //     details:
+    //       error instanceof Error ? error.message : "Unknown error occurred",
+    //   });
+    // }
 
   
   };
@@ -341,7 +340,7 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
           <ul>
             <li>✅ App Name: "Twilight Self Passport"</li>
             <li>✅ Scope: "twilight-relayer-passport"</li>
-            <li>✅ User Data: "Twilight Framework Self Passport Integration Test!"</li>
+            <li>✅ User Data: {TEST_COSMOS_ADDRESS}</li>
             <li>✅ Disclosures: issuing_state, expiry_date</li>
             <li>✅ OFAC: false</li>
             <li>✅ Excluded Countries: IRN, PRK, CUB, SYR</li>
