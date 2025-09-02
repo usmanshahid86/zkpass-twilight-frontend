@@ -28,7 +28,7 @@ interface VerificationStatus {
 export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onVerificationComplete }) => {
   // Environment configuration
   const BACKEND_URL =
-    import.meta.env.VITE_BACKEND_URL || "http://147.182.247.84:3001";
+    import.meta.env.VITE_BACKEND_URL || "https://54ccbfd72ab3.ngrok-free.app";
   const APP_NAME = import.meta.env.VITE_SELF_APP_NAME || 'Twilight Self Passport';
   const SCOPE = import.meta.env.VITE_SELF_SCOPE || 'twilight-relayer-passport';
   
@@ -54,7 +54,7 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
   const [isVerified, setIsVerified] = useState(false);
 
   // Hardcoded cosmos address for testing
-  const TEST_COSMOS_ADDRESS = "cosmos1zyxwvut7cglh3gm0dtq2gxv76xcf54knh2kdwh";
+  const TEST_COSMOS_ADDRESS = "cosmos1zyxwvut7cglh3gm0dtq2gxv76xcf54knh2kjaa";
 
   // Initialize Self Protocol on component mount
   useEffect(() => {
@@ -129,7 +129,8 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
       const response = await fetch(`${BACKEND_URL}/health`, {
         headers: {
           'Accept': 'application/json',
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': '1'
         }
       });
       if (response.ok) {
@@ -147,70 +148,83 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
 
   const handleSuccessfulVerification = async () => {
     console.log("🎉 Verification successful!");
-    
+    // Set verification flag
+    setIsVerified(true);
+    // Hide the QR code component
+    setSelfApp(null);
+    // Update all remaining verification steps
+    setVerificationSteps((prev) => ({
+      ...prev,
+      appScanned: true, // Add this line to fix the scan status
+      proofProvided: true,
+      backendVerified: true,
+    }));
+
+    setVerificationStatus({
+      status: "success",
+      message: "🎉 Identity verification completed successfully!",
+    });
+
     try {
-      console.log('📤 Sending verification data to backend...', {
+      console.log("📤 Sending verification data to backend...", {
         cosmosAddress: TEST_COSMOS_ADDRESS,
-        attestationId: userId
+        attestationId: userId,
       });
 
       const response = await fetch(`${BACKEND_URL}/api/verify/self`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           cosmosAddress: TEST_COSMOS_ADDRESS,
-          uuid: userId
-        })
+          uuid: userId,
+        }),
       });
 
       // display the response to the console
-      console.log('📤 Response from backend for CosmosAddress communication:', response);
+      console.log(
+        "📤 Raw Response from Server for CosmosAddress communication:",
+        response
+      );
 
-      // Set verification flag
-      setIsVerified(true);
-      
-      // Update all remaining verification steps
-      setVerificationSteps(prev => ({
-        ...prev,
-        appScanned: true, // Add this line to fix the scan status
-        proofProvided: true,
-        backendVerified: true
-      }));
-      
-      setVerificationStatus({
-        status: 'success',
-        message: '🎉 Identity verification completed successfully!'
+      // Parse and log the response data
+      const responseData = await response.json();
+      console.log("📤 Response Data:", {
+        status: responseData.status,
+        message: responseData.message,
+        savedData: responseData.data,
+        timestamp: new Date(responseData.timestamp).toLocaleString(),
       });
-      
-      // Hide the QR code component
-      setSelfApp(null);
-      
+      // Identity proof verification is working fine. We need to save the data on the backend server.
+      if (!response.ok) {
+        throw new Error(
+          responseData.message ||
+            "Failed to save verification data on Backend server. Retry sending the cosmos address and uuid data"
+        );
+      }
+
       // Notify parent component
       onVerificationComplete({
         verified: true,
         timestamp: Date.now(),
-        source: 'self-protocol'
+        source: "self-protocol",
       });
     } catch (error) {
-      console.error("❌ Verification failed", error);
+      // Sending Self Protocol Verification data to Backend server failed. The Identity verification is working fine.No need to do it again. 
+      // Send a notification to the user or retry sending the data to the backend server.
+
+      console.error("❌ Sending Self Protocol Verification data to Backend server failed", error);
 
       setVerificationStatus({
         status: "error",
-        message: "❌ Verification succeeded but failed to save data",
-        details: error instanceof Error ? error.message : 'Unknown error occurred',
+        message: "❌ Sending Self Protocol Verification data to Backend server failed",
+        details:
+          error instanceof Error ? error.message : "Unknown error occurred",
       });
-
-      setVerificationSteps(prev => ({
-        ...prev,
-        appScanned: true,
-        proofProvided: true,
-        backendVerified: false
-      }));
-
-      setSelfApp(null);
     }
+
+  
   };
 
   const handleVerificationError = (error: unknown) => {
@@ -329,7 +343,7 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
             <li>✅ Scope: "twilight-relayer-passport"</li>
             <li>✅ User Data: "Twilight Framework Self Passport Integration Test!"</li>
             <li>✅ Disclosures: issuing_state, expiry_date</li>
-            <li>✅ OFAC: true</li>
+            <li>✅ OFAC: false</li>
             <li>✅ Excluded Countries: IRN, PRK, CUB, SYR</li>
             <li>👤 User ID: {userId.substring(0, 10)}...</li>
           </ul>
