@@ -4,13 +4,70 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { getUniversalLink } from "@selfxyz/core";
+import { getUniversalLink, countries } from "@selfxyz/core";
 import { SelfQRcodeWrapper, SelfAppBuilder, type SelfApp } from "@selfxyz/qrcode";
 import { v4 as uuidv4 } from 'uuid';
+import type { Country3LetterCode } from "@selfxyz/common"; // or the package where the enum lives
+import type { SelfAppDisclosureConfig } from "@selfxyz/common";
+// Environment configuration
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+const APP_NAME = import.meta.env.VITE_SELF_APP_NAME || "Twilight Self Passport";
+const SCOPE = import.meta.env.VITE_SELF_SCOPE || "twilight-relayer-passport";
 
-  // Hardcoded cosmos address for testing
-  const TEST_COSMOS_ADDRESS = "twilight1zyxwvut7cglh3gm0dtq2gxv76xcf54knh2kjcc";
 
+// interface DisclosureConfig {
+//   ofac: boolean;
+//   excludedCountries: Country3LetterCode[];
+//   nationality: boolean;
+//   gender: boolean;
+//   date_of_birth: boolean;
+//   passport_number: boolean;
+//   expiry_date: boolean;
+//   issuing_state: boolean;
+//   name: boolean;
+// }
+
+/** Build excludedCountries from a single allowlist JSON in .env */
+// export function buildExcludedCountriesFromEnv(): Country3LetterCode[] {
+//   const raw = import.meta.env.VITE_SELF_APAC_ALLOWED;
+//   if (!raw) throw new Error("VITE_SELF_APAC_ALLOWED is missing");
+
+//   let allowedParsed: unknown;
+//   try {
+//     allowedParsed = JSON.parse(raw);
+//   } catch (e) {
+//     throw new Error("VITE_SELF_APAC_ALLOWED is not valid JSON");
+//   }
+
+//   if (
+//     !Array.isArray(allowedParsed) ||
+//     !allowedParsed.every((x) => typeof x === "string")
+//   ) {
+//     throw new Error(
+//       "VITE_SELF_APAC_ALLOWED must be a JSON array of ISO-3 strings"
+//     );
+//   }
+
+//   const allSelfCodes = Object.values(countries) as Country3LetterCode[];
+//   // Build a typed allow set, and ignore any codes not present in Self's countries
+//   const allowedSet = new Set<Country3LetterCode>();
+//   for (const code of allowedParsed as string[]) {
+//     if ((allSelfCodes as readonly string[]).includes(code)) {
+//       allowedSet.add(code as Country3LetterCode);
+//     } else {
+//       console.warn(
+//         `[Self] Ignoring unsupported ISO-3 code in VITE_SELF_APAC_ALLOWED: ${code}`
+//       );
+//     }
+//   }
+
+//   // Everything NOT allowed becomes excluded (typed as Country3LetterCode)
+//   return allSelfCodes.filter((code) => !allowedSet.has(code));
+// }
+
+// Hardcoded cosmos address for testing
+const TEST_COSMOS_ADDRESS = "twilight1zyxwvut7cglh3gm0dtq2gxv76xcf54knh2kj11";
+  
 interface VerificationResult {
   verified: boolean;
   timestamp: number;
@@ -27,21 +84,54 @@ interface VerificationStatus {
   details?: string;
 }
 
+//const excludedCountries = buildExcludedCountriesFromEnv();
+//console.log("🌍 Excluded Countries:", excludedCountries);
+
+// function to fetch the disclosure config from the backend
+const fetchDisclosureConfig = async (): Promise<SelfAppDisclosureConfig> => {
+  try {
+    const response = await fetch(`${BACKEND_URL}/disclosures`, {
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "1",
+      },
+    });
+    if (!response.ok) {
+      throw new Error(
+        `Backend server responded with status: ${response.status}`
+      );
+    }
+
+    const data = await response.json();
+    console.log("✅ Raw response from backend for disclosure config:", data);
+    // Validate the response structure
+    if (!data.data || data.status !== "success") {
+      throw new Error("Invalid response format from server");
+    }
+
+    const config = data.data as SelfAppDisclosureConfig;
+    console.log("✅ Parsed disclosure config:", config);
+
+    return config;
+  } catch (error) {
+    console.error("❌ Failed to fetch disclosure config:", error);
+    throw error;
+  }
+}
+
+
 export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onVerificationComplete }) => {
-  // Environment configuration
-  const BACKEND_URL =
-    import.meta.env.VITE_BACKEND_URL || "https://54ccbfd72ab3.ngrok-free.app";
-  const APP_NAME = import.meta.env.VITE_SELF_APP_NAME || 'Twilight Self Passport';
-  const SCOPE = import.meta.env.VITE_SELF_SCOPE || 'twilight-relayer-passport';
   
   // State management
   const [selfApp, setSelfApp] = useState<SelfApp | null>(null);
-  const [universalLink, setUniversalLink] = useState<string>('');
+  const [universalLink, setUniversalLink] = useState<string>("");
   const [userId] = useState(uuidv4());
-  const [verificationStatus, setVerificationStatus] = useState<VerificationStatus>({ 
-    status: 'idle', 
-    message: 'Ready to start verification' 
-  });
+  const [verificationStatus, setVerificationStatus] =
+    useState<VerificationStatus>({
+      status: "idle",
+      message: "Ready to start verification",
+    });
 
   // New state for tracking verification steps
   const [verificationSteps, setVerificationSteps] = useState({
@@ -54,6 +144,9 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
 
   // Add a new state to track verification completion
   const [isVerified, setIsVerified] = useState(false);
+  // get Config from the backend 
+  const [disclosureConfig, setDisclosureConfig] = useState<SelfAppDisclosureConfig | null>(null);
+
 
   // Initialize Self Protocol on component mount
   useEffect(() => {
@@ -61,14 +154,19 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
     testBackendConnection();
   }, []);
 
-  
   // Initialize Self Protocol
   // This function initializes the Self Protocol and sets up the Self App
 
   const initializeSelfProtocol = async () => {
     try {
-      console.log('🚀 Initializing Self Protocol with connection to Self App...');
-      
+      console.log(
+        "🚀 Initializing Self Protocol with connection to Self App..."
+      );
+       // Fetch disclosures first
+      const config = await fetchDisclosureConfig();
+      setDisclosureConfig(config);
+      //console.log('Using disclosure config:', disclosureConfig);
+
       const selfAppBuilder = new SelfAppBuilder({
         version: 2,
         appName: APP_NAME,
@@ -79,69 +177,70 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
         endpointType: "staging_https",
         userIdType: "uuid",
         userDefinedData: TEST_COSMOS_ADDRESS,
-        disclosures: {
-          // 1. what you want to verify from users' identity
-          // minimumAge: 18,
-          ofac: false,
-          excludedCountries: ['IRN', 'PRK', 'CUB','SYR'],
+         // Fetch disclosures first
+        disclosures: config,
+        // disclosures: {
+        //   // 1. what you want to verify from users' identity
+        //   // minimumAge: 18,
+        //   ofac: false,
+        //   excludedCountries: excludedCountries,
 
-          // 2. what you want users to reveal (Optional)
-          nationality: false,
-          gender: false,
-          date_of_birth: false,
-          passport_number: false,
-          expiry_date: true,
-          issuing_state: true,
-           name: false,
-        },
+        //   // 2. what you want users to reveal (Optional)
+        //   nationality: false,
+        //   gender: false,
+        //   date_of_birth: false,
+        //   passport_number: false,
+        //   expiry_date: true,
+        //   issuing_state: true,
+        //   name: false,
+        // },
         devMode: true,
       });
 
-  
 
       const app = selfAppBuilder.build();
       setSelfApp(app);
-      
-      // Update verification step
-      setVerificationSteps(prev => ({ ...prev, sdkInitialized: true }));
 
-      
+      // Update verification step
+      setVerificationSteps((prev) => ({ ...prev, sdkInitialized: true }));
+
       const link = getUniversalLink(app);
       setUniversalLink(link);
-      
-      console.log('✅ Self Protocol initialized successfully');
-      console.log('🔗 Universal Link:', link);
-      console.log('👤 User ID:', userId);
-      
+
+      console.log("✅ Self Protocol initialized successfully");
+      console.log("🔗 Universal Link:", link);
+      console.log("👤 User ID:", userId);
     } catch (error) {
-      console.error('❌ Failed to initialize Self app:', error);
+      console.error("❌ Failed to initialize Self app:", error);
       setVerificationStatus({
-        status: 'error',
-        message: '❌ Failed to initialize Self Protocol'
+        status: "error",
+        message: "❌ Failed to initialize Self Protocol",
       });
     }
   };
 
   const testBackendConnection = async () => {
     try {
-      console.log('🔍 Testing backend connectivity...', BACKEND_URL);
+      console.log("🔍 Testing backend connectivity...", BACKEND_URL);
       const response = await fetch(`${BACKEND_URL}/health`, {
         headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': '1'
-        }
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "1",
+        },
       });
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Backend server connected:', data);
-        setVerificationSteps(prev => ({ ...prev, backendConnected: true }));
+        console.log("✅ Backend server connected:", data);
+        setVerificationSteps((prev) => ({ ...prev, backendConnected: true }));
       } else {
-        throw new Error(`Backend server responded with status: ${response.status}`);
+        throw new Error(
+          `Backend server responded with status: ${response.status}`
+        );
       }
     } catch (error) {
-      console.warn('⚠️ Backend server not reachable:', error);
-      console.warn('⚠️ Attempted URL:', `${BACKEND_URL}/health`);
+      console.warn("⚠️ Backend server not reachable:", error);
+      console.warn("⚠️ Attempted URL:", `${BACKEND_URL}/health`);
     }
   };
 
@@ -210,7 +309,7 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
     //     source: "self-protocol",
     //   });
     // } catch (error) {
-    //   // Sending Self Protocol Verification data to Backend server failed. The Identity verification is working fine.No need to do it again. 
+    //   // Sending Self Protocol Verification data to Backend server failed. The Identity verification is working fine.No need to do it again.
     //   // Send a notification to the user or retry sending the data to the backend server.
 
     //   console.error("❌ Sending Self Protocol Verification data to Backend server failed", error);
@@ -222,20 +321,18 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
     //       error instanceof Error ? error.message : "Unknown error occurred",
     //   });
     // }
-
-  
   };
 
   const handleVerificationError = (error: unknown) => {
     console.error("❌ Verification failed", error);
 
-    let errorDetails = 'Unknown error occurred';
-    
+    let errorDetails = "Unknown error occurred";
+
     if (error instanceof Error) {
       errorDetails = error.message;
-    } else if (typeof error === 'string') {
+    } else if (typeof error === "string") {
       errorDetails = error;
-    } else if (error && typeof error === 'object' && 'message' in error) {
+    } else if (error && typeof error === "object" && "message" in error) {
       errorDetails = String(error.message);
     }
 
@@ -247,44 +344,45 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
   };
 
   const handleRetry = () => {
-    setVerificationStatus({ status: 'idle', message: 'Ready to start verification' });
+    setVerificationStatus({
+      status: "idle",
+      message: "Ready to start verification",
+    });
     initializeSelfProtocol();
   };
 
   const openSelfApp = () => {
     if (universalLink) {
-      console.log('📱 Opening Self app with universal link:', universalLink);
-      window.open(universalLink, '_blank');
+      console.log("📱 Opening Self app with universal link:", universalLink);
+      window.open(universalLink, "_blank");
       setVerificationStatus({
-        status: 'opened',
-        message: '📱 Self app opened - complete verification there'
+        status: "opened",
+        message: "📱 Self app opened - complete verification there",
       });
-      
+
       // Update verification step for app scan
-      setVerificationSteps(prev => ({ ...prev, appScanned: true }));
+      setVerificationSteps((prev) => ({ ...prev, appScanned: true }));
     }
   };
 
   // Function to get step status class
-  const getStepClass = (completed: boolean) => completed ? 'completed' : 'pending';
-  const getStepIcon = (completed: boolean) => completed ? '✅' : '⏳';
+  const getStepClass = (completed: boolean) =>
+    completed ? "completed" : "pending";
+  const getStepIcon = (completed: boolean) => (completed ? "✅" : "⏳");
 
   return (
     <div className="self-verification-container">
       <h3>🛡️ Self Protocol Identity Verification</h3>
-      
+
       {/* QR Code Section */}
       <div className="qr-section">
-        {verificationStatus.status === 'error' ? (
+        {verificationStatus.status === "error" ? (
           <div className="verification-error">
             <h4>{verificationStatus.message}</h4>
             {verificationStatus.details && (
               <p className="error-details">{verificationStatus.details}</p>
             )}
-            <button 
-              className="retry-button"
-              onClick={handleRetry}
-            >
+            <button className="retry-button" onClick={handleRetry}>
               🔄 Try Again
             </button>
           </div>
@@ -317,7 +415,7 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
 
       {/* Universal Link Section */}
       <div className="universal-link-section">
-        <button 
+        <button
           className="open-app-button"
           onClick={openSelfApp}
           disabled={!universalLink}
@@ -353,19 +451,24 @@ export const SelfVerificationComponent: React.FC<SelfVerificationProps> = ({ onV
           <h4>🔄 Verification Process:</h4>
           <ol>
             <li className={getStepClass(verificationSteps.sdkInitialized)}>
-              {getStepIcon(verificationSteps.sdkInitialized)} Self Protocol App initialized
+              {getStepIcon(verificationSteps.sdkInitialized)} Self Protocol App
+              initialized
             </li>
             <li className={getStepClass(verificationSteps.backendConnected)}>
-              {getStepIcon(verificationSteps.backendConnected)} Verification server connected
+              {getStepIcon(verificationSteps.backendConnected)} Verification
+              server connected
             </li>
             <li className={getStepClass(verificationSteps.appScanned)}>
-              {getStepIcon(verificationSteps.appScanned)} Self app scan completed
+              {getStepIcon(verificationSteps.appScanned)} Self app scan
+              completed
             </li>
             <li className={getStepClass(verificationSteps.proofProvided)}>
-              {getStepIcon(verificationSteps.proofProvided)} User provided identity proof
+              {getStepIcon(verificationSteps.proofProvided)} User provided
+              identity proof
             </li>
             <li className={getStepClass(verificationSteps.backendVerified)}>
-              {getStepIcon(verificationSteps.backendVerified)} Identity proof verified
+              {getStepIcon(verificationSteps.backendVerified)} Identity proof
+              verified
             </li>
           </ol>
         </div>
